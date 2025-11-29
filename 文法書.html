@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 互動講義 V10.0 (點讀旗艦版)</title>
+    <style>
+        :root {
+            --primary: #2c3e50; --accent: #3498db; --success: #27ae60;
+            --bg: #ecf0f1; --card-bg: #ffffff; --text: #34495e;
+            --highlight: #f1c40f; --word-hover: #e74c3c;
+        }
+
+        body {
+            font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+            background-color: var(--bg); color: var(--text);
+            margin: 0; padding: 0; line-height: 1.6;
+        }
+
+        nav {
+            background: var(--primary); color: white; padding: 15px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100;
+        }
+        .logo { font-size: 1.2rem; font-weight: bold; }
+        .mode-switch {
+            background: var(--accent); border: none; color: white;
+            padding: 8px 15px; border-radius: 20px; cursor: pointer; font-size: 0.9rem;
+        }
+
+        .container { max-width: 800px; margin: 20px auto; padding: 0 15px; padding-bottom: 100px; }
+
+        /* 老師備課區 */
+        #teacher-zone { display: none; }
+        .editor-card {
+            background: white; padding: 20px; border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px;
+        }
+        h3 { margin-top: 0; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        textarea {
+            width: 100%; height: 120px; padding: 10px;
+            border: 2px solid #bdc3c7; border-radius: 8px;
+            margin-bottom: 15px; font-size: 1rem; font-family: monospace;
+            resize: vertical;
+        }
+        textarea:focus { border-color: var(--accent); outline: none; }
+
+        #prompt-preview-area { display: none; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px dashed #bdc3c7; margin-bottom: 15px; }
+        #prompt-output { background: #e8e8e8; color: #555; border: none; height: 100px; font-size: 0.9rem; }
+
+        .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+        .action-btn {
+            border: none; padding: 10px 20px; border-radius: 5px;
+            cursor: pointer; font-size: 1rem; color: white; font-weight: bold;
+            transition: transform 0.1s;
+        }
+        .action-btn:active { transform: scale(0.98); }
+        .btn-gen { background: var(--accent); }
+        .btn-copy { background: var(--success); }
+        .btn-save { background: #e67e22; width: 100%; font-size: 1.2rem; }
+
+        /* 學生學習區 */
+        #student-zone { display: block; }
+        .lesson-card {
+            background: var(--card-bg); border-radius: 12px;
+            margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            overflow: hidden; border: 1px solid #eee;
+        }
+        
+        /* 課文區塊 */
+        .text-section {
+            padding: 20px; cursor: pointer; transition: background 0.2s;
+            border-bottom: 1px dashed #eee; position: relative;
+        }
+        .text-section:hover { background-color: #f7f9f9; }
+        .text-section.playing { background-color: #fff9c4; border-left: 5px solid #f1c40f; }
+        
+        .play-icon { position: absolute; right: 20px; top: 20px; font-size: 1.5rem; opacity: 0.3; }
+        .english-text { font-size: 1.4rem; font-weight: 500; color: #2c3e50; margin-bottom: 8px; padding-right: 30px; line-height: 1.6; }
+        .chinese-trans { font-size: 1rem; color: #7f8c8d; }
+
+        /* 單字互動樣式 */
+        .word {
+            display: inline-block;
+            border-radius: 4px;
+            padding: 0 2px;
+            transition: all 0.1s;
+            cursor: pointer;
+        }
+        .word:hover { color: var(--word-hover); text-decoration: underline; }
+        .word:active { transform: scale(0.95); background-color: #eee; }
+
+        /* 解析區 */
+        .analysis-section {
+            background: #fafafa; padding: 15px 20px; font-size: 0.95rem; border-top: 1px solid #eee;
+        }
+        .tag {
+            display: inline-block; background: #3498db; color: white;
+            padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; margin-right: 5px;
+        }
+        .vocab-list { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px; }
+        .vocab-chip { background: #e0e0e0; color: #333; padding: 2px 10px; border-radius: 15px; font-size: 0.85rem; }
+
+        /* 語音控制條 */
+        .voice-controls {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: white; padding: 10px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            display: flex; justify-content: center; gap: 10px; z-index: 100;
+        }
+        select { padding: 5px; border-radius: 5px; border: 1px solid #ccc; max-width: 200px; }
+
+        /* 單字翻譯彈窗 (Toast) */
+        #word-toast {
+            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+            background: rgba(44, 62, 80, 0.95); color: white;
+            padding: 10px 20px; border-radius: 30px;
+            font-size: 1.1rem; box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            z-index: 2000; opacity: 0; pointer-events: none;
+            transition: opacity 0.3s, transform 0.3s;
+            text-align: center; max-width: 90%; white-space: nowrap;
+        }
+        #word-toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
+        #word-toast strong { color: #f1c40f; margin-right: 10px; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="logo">📚 Smart Lesson V10</div>
+    <button class="mode-switch" onclick="toggleMode()">切換: 備課 / 上課</button>
+</nav>
+
+<div class="container">
+
+    <div id="teacher-zone">
+        <div class="editor-card">
+            <h3>步驟 1: 輸入課文</h3>
+            <textarea id="raw-text" placeholder="請在此貼上英文課文..."></textarea>
+            <div class="btn-row">
+                <button class="action-btn btn-gen" onclick="generatePrompt()">🧙‍♂️ 生成 AI 指令</button>
+            </div>
+        </div>
+
+        <div class="editor-card" id="prompt-preview-area">
+            <h3>步驟 2: 複製指令給 AI</h3>
+            <p style="font-size:0.9rem; color:#666;">指令如下，請按複製，貼給 ChatGPT。</p>
+            <textarea id="prompt-output" readonly></textarea>
+            <div class="btn-row">
+                <button class="action-btn btn-copy" onclick="copyPrompt()">📋 複製到剪貼簿</button>
+                <a href="https://chat.openai.com/" target="_blank" style="margin-left:auto; color:#3498db; text-decoration:none; align-self:center;">前往 ChatGPT ↗</a>
+            </div>
+        </div>
+
+        <div class="editor-card">
+            <h3>步驟 3: 貼上 AI 回傳資料</h3>
+            <p style="font-size:0.9rem; color:#666;">請將 AI 回傳的代碼完整貼在下方 (系統會自動過濾雜訊)。</p>
+            <textarea id="json-input" placeholder='請貼上 [ { ... } ] 格式的資料' style="height:200px;"></textarea>
+            <button class="action-btn btn-save" onclick="saveAndRender()">💾 儲存並開始上課</button>
+        </div>
+        
+        <div style="text-align:center; margin-top:20px;">
+            <button style="background:none; border:none; color:#e74c3c; cursor:pointer; text-decoration:underline;" onclick="resetAll()">清除重置</button>
+        </div>
+    </div>
+
+    <div id="student-zone">
+        <div id="lesson-container">
+            <div style="text-align:center; padding: 50px; color:#999;">
+                尚無課程資料，請點擊右上方切換至「備課模式」。
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div id="word-toast">
+    <strong id="toast-word">Word</strong>
+    <span id="toast-mean">...</span>
+</div>
+
+<div class="voice-controls" id="voice-controls" style="display:none;">
+    <select id="voiceSelect"></select>
+    <button class="action-btn" style="background:#e74c3c; padding:5px 15px;" onclick="stopSpeech()">⏹ 停止</button>
+</div>
+
+<script>
+    let lessonData = [];
+    const STORAGE_KEY = 'smart_lesson_data_v10';
+    const synth = window.speechSynthesis;
+    let currentUtterance = null;
+
+    window.onload = function() {
+        loadData();
+        initVoices();
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = initVoices;
+        }
+    };
+
+    function toggleMode() {
+        const tZone = document.getElementById('teacher-zone');
+        const sZone = document.getElementById('student-zone');
+        const vCtrl = document.getElementById('voice-controls');
+        
+        if (tZone.style.display === 'none') {
+            tZone.style.display = 'block';
+            sZone.style.display = 'none';
+            vCtrl.style.display = 'none';
+            stopSpeech();
+        } else {
+            tZone.style.display = 'none';
+            sZone.style.display = 'block';
+            vCtrl.style.display = 'flex';
+            renderLesson();
+        }
+    }
+
+    // ==========================================
+    // 備課與資料處理
+    // ==========================================
+    function generatePrompt() {
+        const text = document.getElementById('raw-text').value.trim();
+        if (!text) return alert("請先輸入英文課文！");
+
+        const prompt = `
+你是專業英語教材專家。請將以下文章拆解為 JSON 格式，用於教學軟體。
+請回傳一個 JSON Array，不要包含 markdown 標記 (如 \`\`\`json)，直接回傳純文字 JSON。
+
+格式範本：
+[
+  {
+    "english": "英文段落原文",
+    "chinese": "中文翻譯",
+    "grammar": "<ul><li><b>重點：</b>說明...</li></ul>",
+    "vocab": ["單字1", "單字2"]
+  }
+]
+
+解說要求：
+1. 適合高中/國中程度。
+2. Grammar 欄位請用 HTML <ul> <li> <b> 排版。
+3. 若有複雜句型請給簡短例句。
+
+文章內容：
+${text}
+`;
+        document.getElementById('prompt-preview-area').style.display = 'block';
+        document.getElementById('prompt-output').value = prompt.trim();
+        document.getElementById('prompt-preview-area').scrollIntoView({behavior: "smooth"});
+    }
+
+    function copyPrompt() {
+        navigator.clipboard.writeText(document.getElementById('prompt-output').value).then(() => {
+            alert("指令已複製！");
+        });
+    }
+
+    function saveAndRender() {
+        const inputStr = document.getElementById('json-input').value.trim();
+        if(!inputStr) return alert("請貼上資料！");
+
+        if (inputStr.includes("你是專業英語教材專家")) return alert("⛔ 貼錯了！您貼到指令了，請去 ChatGPT 複製結果。");
+
+        try {
+            const jsonMatch = inputStr.match(/\[\s*\{[\s\S]*\}\s*\]/);
+            if (!jsonMatch) throw new Error("找不到有效的 JSON 結構。");
+
+            const data = JSON.parse(jsonMatch[0]);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            lessonData = data;
+            
+            alert("✅ 成功生成！");
+            toggleMode(); 
+        } catch (e) {
+            alert("⚠️ 解析失敗，請確認 AI 回傳格式正確。");
+        }
+    }
+
+    function loadData() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try {
+                lessonData = JSON.parse(saved);
+                renderLesson();
+                document.getElementById('teacher-zone').style.display = 'none';
+                document.getElementById('student-zone').style.display = 'block';
+                document.getElementById('voice-controls').style.display = 'flex';
+            } catch(e) {}
+        } else {
+            document.getElementById('teacher-zone').style.display = 'block';
+            document.getElementById('student-zone').style.display = 'none';
+        }
+    }
+
+    function resetAll() {
+        if(confirm("確定清除？")) {
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
+        }
+    }
+
+    // ==========================================
+    // 渲染 (V10 核心：單字切割)
+    // ==========================================
+    function renderLesson() {
+        const container = document.getElementById('lesson-container');
+        container.innerHTML = '';
+
+        if (!lessonData || lessonData.length === 0) return;
+
+        lessonData.forEach((item, index) => {
+            const card = document.createElement('div');
+            card.className = 'lesson-card';
+            
+            // 單字 HTML
+            let vocabHtml = '';
+            if (item.vocab && item.vocab.length > 0) {
+                vocabHtml = `<div class="vocab-list">${item.vocab.map(v => `<span class="vocab-chip">${v}</span>`).join('')}</div>`;
+            }
+
+            // 處理英文段落：將單字切開
+            const processedEnglish = item.english.split(/([a-zA-Z0-9'-]+)/g).map(chunk => {
+                if (/[a-zA-Z0-9'-]+/.test(chunk)) {
+                    // 加入 onclick="playWord"
+                    return `<span class="word" onclick="playWord(event, '${chunk}')">${chunk}</span>`;
+                }
+                return chunk;
+            }).join('');
+
+            card.innerHTML = `
+                <div class="text-section" onclick="playSectionAudio(this, '${escapeJs(item.english)}')">
+                    <div class="play-icon">🔊</div>
+                    <div class="english-text">${processedEnglish}</div>
+                    <div class="chinese-trans">${item.chinese}</div>
+                </div>
+                <div class="analysis-section">
+                    <div class="tag">解析</div>
+                    <div style="margin-top:10px;">${item.grammar || '無重點解說'}</div>
+                    ${vocabHtml ? `<div style="margin-top:15px; border-top:1px dashed #ccc; padding-top:10px;"><span class="tag" style="background:#e67e22">單字</span>${vocabHtml}</div>` : ''}
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function escapeJs(str) {
+        return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    // ==========================================
+    // 語音與互動邏輯
+    // ==========================================
+    function initVoices() {
+        const select = document.getElementById('voiceSelect');
+        const voices = synth.getVoices();
+        if(voices.length === 0) return;
+        
+        select.innerHTML = '';
+        let bestIdx = 0;
+        voices.forEach((v, i) => {
+            let opt = document.createElement('option');
+            opt.value = i;
+            opt.text = `${v.name.substring(0, 15)}.. (${v.lang})`;
+            select.appendChild(opt);
+            if (v.lang === 'en-US' && v.name.includes('Google')) bestIdx = i;
+        });
+        select.selectedIndex = bestIdx;
+    }
+
+    // 1. 播放整段
+    function playSectionAudio(element, text) {
+        stopSpeech();
+        element.classList.add('playing');
+
+        const utter = new SpeechSynthesisUtterance(text);
+        setVoice(utter);
+        utter.rate = 0.9; 
+
+        utter.onend = () => { element.classList.remove('playing'); };
+        currentUtterance = utter;
+        synth.speak(utter);
+    }
+
+    // 2. 播放單字 (點擊單字時觸發)
+    function playWord(event, word) {
+        // 關鍵：阻止事件冒泡 (Stop Propagation)，防止觸發整段朗讀
+        event.stopPropagation();
+        
+        // 停止目前的朗讀
+        stopSpeech();
+
+        // 朗讀單字
+        const utter = new SpeechSynthesisUtterance(word);
+        setVoice(utter);
+        utter.rate = 0.8; // 單字唸慢一點
+        synth.speak(utter);
+
+        // 查詢單字意思
+        showWordToast(word);
+    }
+
+    function setVoice(utter) {
+        const voices = synth.getVoices();
+        const select = document.getElementById('voiceSelect');
+        if (voices.length > 0) utter.voice = voices[select.value];
+    }
+
+    function stopSpeech() {
+        synth.cancel();
+        document.querySelectorAll('.text-section').forEach(el => el.classList.remove('playing'));
+    }
+
+    // 3. 顯示單字翻譯
+    async function showWordToast(word) {
+        const toast = document.getElementById('word-toast');
+        const tWord = document.querySelector('#word-toast strong');
+        const tMean = document.querySelector('#word-toast span');
+        
+        tWord.innerText = word;
+        tMean.innerText = "查詢中...";
+        toast.classList.add('show');
+        
+        try {
+            const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|zh-TW`);
+            const data = await res.json();
+            if (data.responseData) {
+                // 清理翻譯結果 (去除標點)
+                tMean.innerText = data.responseData.translatedText.replace(/[!.。]/g, "");
+            } else {
+                tMean.innerText = "查無結果";
+            }
+        } catch (e) {
+            tMean.innerText = "網路錯誤";
+        }
+
+        // 3秒後消失
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+</script>
+</body>
+</html>
