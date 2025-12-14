@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 互動講義 V13.0 (穩定查詢版)</title>
+    <title>AI 互動講義 V14.0 (雙劍合璧版)</title>
     <style>
         :root {
             --primary: #2c3e50; --accent: #3498db; --success: #27ae60;
@@ -79,17 +79,13 @@
         .english-text { font-size: 1.4rem; font-weight: 500; color: #2c3e50; margin-bottom: 10px; padding-right: 30px; line-height: 1.6; }
         .chinese-trans { font-size: 1.1rem; color: #7f8c8d; line-height: 1.5; }
 
-        /* 這裡設定為點擊 (cursor: pointer) */
+        /* 文中單字 */
         .word-in-text {
             display: inline-block; border-radius: 4px; padding: 0 2px;
             transition: all 0.1s; cursor: pointer;
             border-bottom: 1px dotted transparent;
         }
-        .word-in-text:hover { 
-            color: var(--word-hover); 
-            background: #fae5e5; 
-            border-bottom: 1px dotted var(--word-hover);
-        }
+        .word-in-text:hover { color: var(--word-hover); background: #fae5e5; border-bottom: 1px dotted var(--word-hover); }
 
         .analysis-section {
             background: #fafafa; padding: 20px; font-size: 1rem; border-top: 1px solid #eee;
@@ -98,6 +94,7 @@
         .analysis-content li { margin-bottom: 8px; }
         .analysis-content b { color: #e67e22; }
         
+        /* V12: 單字卡列表 */
         .vocab-section { background: #fff; padding: 15px 20px; border-top: 1px dashed #ccc; }
         .section-label { font-size: 0.85rem; color: #95a5a6; font-weight: bold; margin-bottom: 10px; display: block; }
         .vocab-list { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -115,14 +112,14 @@
         }
         select { padding: 5px; border-radius: 5px; border: 1px solid #ccc; max-width: 200px; }
 
-        /* Modal (單字卡詳細) */
+        /* V12: 詳細大卡片 (Modal) - 有例句 */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.6); z-index: 3000; align-items: center; justify-content: center;
         }
         .modal-card {
-            background: white; width: 90%; max-width: 400px; padding: 25px;
-            border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            background: white; width: 90%; max-width: 450px; padding: 25px;
+            border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             position: relative; text-align: center;
         }
         .close-modal { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; color: #999; }
@@ -130,11 +127,11 @@
         .modal-meaning { font-size: 1.5rem; color: #e67e22; font-weight: bold; margin-bottom: 15px; }
         .modal-example { 
             background: #f0f3f4; padding: 15px; border-radius: 10px; 
-            text-align: left; font-size: 1.1rem; color: #555; margin-bottom: 20px;
+            text-align: left; font-size: 1.1rem; color: #555; margin-bottom: 20px; line-height: 1.5;
         }
         .modal-example b { color: var(--primary); }
 
-        /* Toast (即時查詢小視窗) */
+        /* V13: 簡易小吐司 (Toast) - 只有意思 */
         #word-toast {
             position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
             background: rgba(44, 62, 80, 0.95); color: white;
@@ -142,8 +139,7 @@
             font-size: 1.1rem; box-shadow: 0 5px 20px rgba(0,0,0,0.3);
             z-index: 2500; opacity: 0; pointer-events: none;
             transition: opacity 0.3s, transform 0.3s;
-            text-align: center; max-width: 90%; 
-            white-space: normal; /* 允許換行 */
+            text-align: center; max-width: 90%; white-space: normal;
         }
         #word-toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
         #word-toast strong { color: #f1c40f; display: block; font-size: 1.3em; margin-bottom: 5px; }
@@ -152,7 +148,7 @@
 <body>
 
 <nav>
-    <div class="logo">📚 Smart Lesson V13</div>
+    <div class="logo">📚 Smart Lesson V14</div>
     <button class="mode-switch" onclick="toggleMode()">切換: 備課 / 上課</button>
 </nav>
 
@@ -178,10 +174,7 @@
 
         <div class="editor-card">
             <h3>步驟 3: 貼上 AI 回傳資料</h3>
-            <p style="font-size:0.9rem; color:#666;">
-                請將 AI 回傳的代碼 (含 [ ... ]) 貼在下方。<br>
-                <strong style="color:var(--success)">✨ 系統會自動修復格式錯誤</strong>
-            </p>
+            <p style="font-size:0.9rem; color:#666;">系統會自動修復格式錯誤。</p>
             <textarea id="json-input" placeholder='請貼上 [ { ... } ] 格式的資料' style="height:200px;"></textarea>
             <button class="action-btn btn-save" onclick="saveAndRender()">💾 儲存並開始上課</button>
         </div>
@@ -223,7 +216,7 @@
 
 <script>
     let lessonData = [];
-    const STORAGE_KEY = 'smart_lesson_data_v13';
+    const STORAGE_KEY = 'smart_lesson_data_v14';
     const synth = window.speechSynthesis;
     let currentUtterance = null;
     let currentVocabData = null;
@@ -254,16 +247,13 @@
         }
     }
 
-    // ==========================================
-    // 備課與資料處理
-    // ==========================================
     function generatePrompt() {
         const text = document.getElementById('raw-text').value.trim();
         if (!text) return alert("請先輸入英文課文！");
 
         const prompt = `
 你是台灣國中英語補教名師。請將以下課文拆解為詳細的 JSON 教學資料。
-請嚴格回傳一個純 JSON Array，不要 Markdown 標記，不要在 JSON 字串中使用反斜線換行。
+請嚴格回傳一個純 JSON Array，不要 Markdown 標記。
 
 格式如下：
 [
@@ -272,265 +262,4 @@
     "chinese": "中文翻譯",
     "grammar": "請使用 HTML (<ul><li><b>) 排版。內容須包含：<br>1. 重要文法與句型解析<br>2. 片語與慣用語 (Idioms)<br>3. 介係詞用法<br>4. 時態說明<br>請務必詳盡解釋，並適時提供補充例句 (用 <span class='example-sent'>例句</span> 包裹)。",
     "vocab": [
-       { "word": "單字1", "mean": "詞性. 中文意思", "ex": "英文例句。" }
-    ]
-  }
-]
-
-文章內容：
-${text}
-`;
-        document.getElementById('prompt-preview-area').style.display = 'block';
-        document.getElementById('prompt-output').value = prompt.trim();
-        document.getElementById('prompt-preview-area').scrollIntoView({behavior: "smooth"});
-    }
-
-    function copyPrompt() {
-        navigator.clipboard.writeText(document.getElementById('prompt-output').value).then(() => {
-            alert("指令已複製！請貼給 AI。");
-        });
-    }
-
-    function saveAndRender() {
-        let inputStr = document.getElementById('json-input').value.trim();
-        if(!inputStr) return alert("請貼上資料！");
-
-        if (inputStr.includes("你是台灣國中英語補教名師")) return alert("⛔ 貼錯了！您貼到指令了。");
-
-        try {
-            const jsonMatch = inputStr.match(/\[\s*\{[\s\S]*\}\s*\]/);
-            if (!jsonMatch) throw new Error("找不到有效的 JSON 結構。");
-            
-            let cleanJson = jsonMatch[0].replace(/\\\s*(\r\n|\n|\r)/g, ""); // 容錯處理
-
-            const data = JSON.parse(cleanJson);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-            lessonData = data;
-            
-            alert("✅ 成功！開始上課！");
-            toggleMode(); 
-        } catch (e) {
-            alert("⚠️ 解析失敗，請確認 AI 回傳格式正確。");
-        }
-    }
-
-    function loadData() {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            try {
-                lessonData = JSON.parse(saved);
-                renderLesson();
-                document.getElementById('teacher-zone').style.display = 'none';
-                document.getElementById('student-zone').style.display = 'block';
-                document.getElementById('voice-controls').style.display = 'flex';
-            } catch(e) {}
-        } else {
-            document.getElementById('teacher-zone').style.display = 'block';
-            document.getElementById('student-zone').style.display = 'none';
-        }
-    }
-
-    function resetAll() {
-        if(confirm("確定清除所有資料？")) {
-            localStorage.removeItem(STORAGE_KEY);
-            location.reload();
-        }
-    }
-
-    // ==========================================
-    // 渲染 (Render)
-    // ==========================================
-    function renderLesson() {
-        const container = document.getElementById('lesson-container');
-        container.innerHTML = '';
-
-        if (!lessonData || lessonData.length === 0) return;
-
-        lessonData.forEach((item, index) => {
-            const card = document.createElement('div');
-            card.className = 'lesson-card';
-            
-            let vocabHtml = '';
-            if (item.vocab && item.vocab.length > 0) {
-                const chips = item.vocab.map(v => {
-                    const safeWord = escapeJs(v.word);
-                    const safeMean = escapeJs(v.mean);
-                    const safeEx = escapeJs(v.ex);
-                    return `<span class="vocab-chip" onclick="openVocabModal('${safeWord}', '${safeMean}', '${safeEx}')">
-                        <b>${v.word}</b> <span>${v.mean.split('.')[0]}</span>
-                    </span>`;
-                }).join('');
-                vocabHtml = `<div class="vocab-section"><span class="section-label">單字學習 (點擊聽發音與例句)</span><div class="vocab-list">${chips}</div></div>`;
-            }
-
-            const processedEnglish = item.english.split(/([a-zA-Z0-9'-]+)/g).map(chunk => {
-                if (/[a-zA-Z0-9'-]+/.test(chunk)) {
-                    // 點擊事件改為 playWordSmart
-                    return `<span class="word-in-text" onclick="playWordSmart(event, '${chunk}')">${chunk}</span>`;
-                }
-                return chunk;
-            }).join('');
-
-            card.innerHTML = `
-                <div class="text-section" onclick="playSectionAudio(this, '${escapeJs(item.english)}')">
-                    <div class="play-icon">🔊</div>
-                    <div class="english-text">${processedEnglish}</div>
-                    <div class="chinese-trans">${item.chinese}</div>
-                </div>
-                <div class="analysis-section">
-                    <div style="font-weight:bold; color:#2980b9; margin-bottom:10px;">💡 名師解析：</div>
-                    <div class="analysis-content">${item.grammar || '無重點解說'}</div>
-                </div>
-                ${vocabHtml}
-            `;
-            container.appendChild(card);
-        });
-    }
-
-    function escapeJs(str) {
-        if(!str) return "";
-        return str.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ');
-    }
-
-    // ==========================================
-    // 智慧單字點讀 (V13 核心)
-    // ==========================================
-    async function playWordSmart(event, word) {
-        event.stopPropagation(); // 阻止觸發整句
-        stopSpeech(); // 停止其他聲音
-
-        // 1. 發音
-        const utter = new SpeechSynthesisUtterance(word);
-        setVoice(utter);
-        utter.rate = 0.8;
-        synth.speak(utter);
-
-        // 2. 顯示 Toast 意思
-        const toast = document.getElementById('word-toast');
-        const tWord = document.querySelector('#word-toast strong');
-        const tMean = document.querySelector('#word-toast span');
-        
-        tWord.innerText = word;
-        tMean.innerText = "查詢中...";
-        toast.classList.add('show');
-
-        // 3. 搜尋本地資料 (Local Lookup)
-        // 遍歷所有段落的 vocab 尋找匹配
-        let foundMean = null;
-        if (lessonData) {
-            for (let section of lessonData) {
-                if (section.vocab) {
-                    // 忽略大小寫比較
-                    const match = section.vocab.find(v => v.word.toLowerCase() === word.toLowerCase());
-                    if (match) {
-                        foundMean = match.mean;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (foundMean) {
-            // 找到了！使用講義內建解釋
-            tMean.innerText = foundMean;
-        } else {
-            // 沒找到，嘗試外部 API (Fallback)
-            try {
-                const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|zh-TW`);
-                const data = await res.json();
-                if (data.responseData) {
-                    tMean.innerText = data.responseData.translatedText.replace(/[!.。]/g, "");
-                } else {
-                    tMean.innerText = "查無結果";
-                }
-            } catch (e) {
-                tMean.innerText = "網路錯誤且無內建解釋";
-            }
-        }
-
-        // 3秒後消失
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 3000);
-    }
-
-    // ==========================================
-    // 單字卡 Modal 邏輯
-    // ==========================================
-    function openVocabModal(word, mean, ex) {
-        currentVocabData = { word, ex };
-        document.getElementById('m-word').innerText = word;
-        document.getElementById('m-meaning').innerText = mean;
-        document.getElementById('m-example').innerHTML = `Example: <br><b>${ex}</b>`;
-        document.getElementById('vocab-modal').style.display = 'flex';
-        stopSpeech();
-        speakVocab(word, ex);
-    }
-
-    function closeModal(e) {
-        if(e.target.id === 'vocab-modal' || e.target.classList.contains('close-modal')) {
-            document.getElementById('vocab-modal').style.display = 'none';
-            stopSpeech();
-        }
-    }
-
-    function replayVocab() {
-        if(currentVocabData) {
-            speakVocab(currentVocabData.word, currentVocabData.ex);
-        }
-    }
-
-    function speakVocab(word, ex) {
-        const u1 = new SpeechSynthesisUtterance(word);
-        setVoice(u1);
-        u1.rate = 0.8;
-        const u2 = new SpeechSynthesisUtterance(ex);
-        setVoice(u2);
-        u2.rate = 0.9;
-        u1.onend = () => { setTimeout(() => synth.speak(u2), 300); };
-        synth.speak(u1);
-    }
-
-    // ==========================================
-    // 語音基礎
-    // ==========================================
-    function initVoices() {
-        const select = document.getElementById('voiceSelect');
-        const voices = synth.getVoices();
-        if(voices.length === 0) return;
-        select.innerHTML = '';
-        let bestIdx = 0;
-        voices.forEach((v, i) => {
-            let opt = document.createElement('option');
-            opt.value = i;
-            opt.text = `${v.name.substring(0, 15)}.. (${v.lang})`;
-            select.appendChild(opt);
-            if (v.lang === 'en-US' && v.name.includes('Google')) bestIdx = i;
-        });
-        select.selectedIndex = bestIdx;
-    }
-
-    function setVoice(utter) {
-        const voices = synth.getVoices();
-        const select = document.getElementById('voiceSelect');
-        if (voices.length > 0) utter.voice = voices[select.value];
-    }
-
-    function playSectionAudio(element, text) {
-        stopSpeech();
-        element.classList.add('playing');
-        const utter = new SpeechSynthesisUtterance(text);
-        setVoice(utter);
-        utter.rate = 0.9; 
-        utter.onend = () => { element.classList.remove('playing'); };
-        currentUtterance = utter;
-        synth.speak(utter);
-    }
-
-    function stopSpeech() {
-        synth.cancel();
-        document.querySelectorAll('.text-section').forEach(el => el.classList.remove('playing'));
-    }
-</script>
-</body>
-</html>
+       { "word": "單字1", "mean": "詞性. 中
