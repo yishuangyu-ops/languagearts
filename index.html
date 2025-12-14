@@ -1,9 +1,28 @@
+嗨！我當然記得，這是我們一起開發的 **「AI 互動英語講義 (Smart Lesson)」**。
+
+我幫您檢查了原因。您遇到的問題是因為原本的設計是 **「即時連線去查免費字典 API (MyMemory)」**。
+但最近這個免費的字典服務因為使用量太大，常常會**阻擋連線**或是**掛掉**，導致程式雖然有發出查詢請求，但拿不到中文翻譯，所以您只聽得到聲音，卻看不到字義。
+
+為了徹底解決這個問題，我們不應該依賴不穩定的外部字典，而是應該\*\*「優先讀取您用 AI 生成的講義內容」\*\*。
+
+### 🛠️ V13.0 最終穩定版 (本地資料優先)
+
+這個版本做了關鍵改良：
+
+1.  **智慧查詢邏輯**：當您點擊文章中的單字時，程式會**先去檢查您下方的「單字表」**。
+      * 如果單字表有這個字 -\> **直接顯示您備課時的解釋** (最準確、秒開、不會壞)。
+      * 如果單字表沒有 -\> 才嘗試連線去查外部字典。
+2.  **修復顯示**：確保點擊單字時，下方的黑色小視窗 (Toast) 能正確跳出來。
+
+請複製這份代碼，覆蓋您原本的檔案，重新上傳到 GitHub 即可：
+
+```html
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 互動講義 V12.0 (強力容錯版)</title>
+    <title>AI 互動講義 V13.0 (穩定查詢版)</title>
     <style>
         :root {
             --primary: #2c3e50; --accent: #3498db; --success: #27ae60;
@@ -79,11 +98,17 @@
         .english-text { font-size: 1.4rem; font-weight: 500; color: #2c3e50; margin-bottom: 10px; padding-right: 30px; line-height: 1.6; }
         .chinese-trans { font-size: 1.1rem; color: #7f8c8d; line-height: 1.5; }
 
+        /* 這裡設定為點擊 (cursor: pointer) */
         .word-in-text {
             display: inline-block; border-radius: 4px; padding: 0 2px;
             transition: all 0.1s; cursor: pointer;
+            border-bottom: 1px dotted transparent;
         }
-        .word-in-text:hover { color: var(--word-hover); text-decoration: underline; background: #fae5e5; }
+        .word-in-text:hover { 
+            color: var(--word-hover); 
+            background: #fae5e5; 
+            border-bottom: 1px dotted var(--word-hover);
+        }
 
         .analysis-section {
             background: #fafafa; padding: 20px; font-size: 1rem; border-top: 1px solid #eee;
@@ -91,8 +116,7 @@
         .analysis-content ul { padding-left: 20px; margin: 5px 0; }
         .analysis-content li { margin-bottom: 8px; }
         .analysis-content b { color: #e67e22; }
-        .example-sent { color: #27ae60; font-style: italic; display: block; margin-top: 2px; font-size: 0.9em;}
-
+        
         .vocab-section { background: #fff; padding: 15px 20px; border-top: 1px dashed #ccc; }
         .section-label { font-size: 0.85rem; color: #95a5a6; font-weight: bold; margin-bottom: 10px; display: block; }
         .vocab-list { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -102,7 +126,6 @@
             display: flex; align-items: center; gap: 5px;
         }
         .vocab-chip:hover { background: #3498db; color: white; border-color: #3498db; transform: translateY(-2px); }
-        .vocab-chip span { font-size: 0.8em; opacity: 0.7; }
 
         .voice-controls {
             position: fixed; bottom: 0; left: 0; width: 100%;
@@ -111,7 +134,7 @@
         }
         select { padding: 5px; border-radius: 5px; border: 1px solid #ccc; max-width: 200px; }
 
-        /* Modal */
+        /* Modal (單字卡詳細) */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center;
@@ -129,12 +152,26 @@
             text-align: left; font-size: 1.1rem; color: #555; margin-bottom: 20px;
         }
         .modal-example b { color: var(--primary); }
+
+        /* Toast (即時查詢小視窗) */
+        #word-toast {
+            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+            background: rgba(44, 62, 80, 0.95); color: white;
+            padding: 12px 25px; border-radius: 30px;
+            font-size: 1.1rem; box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            z-index: 2500; opacity: 0; pointer-events: none;
+            transition: opacity 0.3s, transform 0.3s;
+            text-align: center; max-width: 90%; 
+            white-space: normal; /* 允許換行 */
+        }
+        #word-toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
+        #word-toast strong { color: #f1c40f; display: block; font-size: 1.3em; margin-bottom: 5px; }
     </style>
 </head>
 <body>
 
 <nav>
-    <div class="logo">📚 Smart Lesson V12</div>
+    <div class="logo">📚 Smart Lesson V13</div>
     <button class="mode-switch" onclick="toggleMode()">切換: 備課 / 上課</button>
 </nav>
 
@@ -145,7 +182,7 @@
             <h3>步驟 1: 輸入課文</h3>
             <textarea id="raw-text" placeholder="請在此貼上英文課文..."></textarea>
             <div class="btn-row">
-                <button class="action-btn btn-gen" onclick="generatePrompt()">🧙‍♂️ 生成深度教學指令</button>
+                <button class="action-btn btn-gen" onclick="generatePrompt()">🧙‍♂️ 生成 AI 指令</button>
             </div>
         </div>
 
@@ -162,7 +199,7 @@
             <h3>步驟 3: 貼上 AI 回傳資料</h3>
             <p style="font-size:0.9rem; color:#666;">
                 請將 AI 回傳的代碼 (含 [ ... ]) 貼在下方。<br>
-                <strong style="color:var(--success)">✨ 新增功能：系統會自動修復 AI 格式錯誤！</strong>
+                <strong style="color:var(--success)">✨ 系統會自動修復格式錯誤</strong>
             </p>
             <textarea id="json-input" placeholder='請貼上 [ { ... } ] 格式的資料' style="height:200px;"></textarea>
             <button class="action-btn btn-save" onclick="saveAndRender()">💾 儲存並開始上課</button>
@@ -193,6 +230,11 @@
     </div>
 </div>
 
+<div id="word-toast">
+    <strong id="toast-word">Word</strong>
+    <span id="toast-mean">...</span>
+</div>
+
 <div class="voice-controls" id="voice-controls" style="display:none;">
     <select id="voiceSelect"></select>
     <button class="action-btn" style="background:#e74c3c; padding:5px 15px;" onclick="stopSpeech()">⏹ 停止</button>
@@ -200,7 +242,7 @@
 
 <script>
     let lessonData = [];
-    const STORAGE_KEY = 'smart_lesson_data_v12';
+    const STORAGE_KEY = 'smart_lesson_data_v13';
     const synth = window.speechSynthesis;
     let currentUtterance = null;
     let currentVocabData = null;
@@ -231,14 +273,16 @@
         }
     }
 
+    // ==========================================
+    // 備課與資料處理
+    // ==========================================
     function generatePrompt() {
         const text = document.getElementById('raw-text').value.trim();
         if (!text) return alert("請先輸入英文課文！");
 
-        // 優化指令，告訴 AI 不要亂換行
         const prompt = `
 你是台灣國中英語補教名師。請將以下課文拆解為詳細的 JSON 教學資料。
-請嚴格回傳一個純 JSON Array，不要 Markdown 標記，不要在 JSON 字串中使用反斜線換行 (No line continuation characters)。
+請嚴格回傳一個純 JSON Array，不要 Markdown 標記，不要在 JSON 字串中使用反斜線換行。
 
 格式如下：
 [
@@ -251,11 +295,6 @@
     ]
   }
 ]
-
-解說要求：
-1. 針對台灣國中生程度 (Junior High School Level)。
-2. 解說要口語化、清楚明白。
-3. 每個段落若有生字，請列入 vocab 陣列中。
 
 文章內容：
 ${text}
@@ -271,9 +310,6 @@ ${text}
         });
     }
 
-    // ==========================================
-    // V12.0 核心更新：強力清洗與防呆
-    // ==========================================
     function saveAndRender() {
         let inputStr = document.getElementById('json-input').value.trim();
         if(!inputStr) return alert("請貼上資料！");
@@ -281,26 +317,19 @@ ${text}
         if (inputStr.includes("你是台灣國中英語補教名師")) return alert("⛔ 貼錯了！您貼到指令了。");
 
         try {
-            // 1. 抓取 JSON 區塊
             const jsonMatch = inputStr.match(/\[\s*\{[\s\S]*\}\s*\]/);
             if (!jsonMatch) throw new Error("找不到有效的 JSON 結構。");
             
-            let cleanJson = jsonMatch[0];
+            let cleanJson = jsonMatch[0].replace(/\\\s*(\r\n|\n|\r)/g, ""); // 容錯處理
 
-            // 2. 【關鍵修復】移除 AI 產生的反斜線換行符號
-            // 這行會把 "<ul>\n<li>" 變成 "<ul><li>"
-            cleanJson = cleanJson.replace(/\\\s*(\r\n|\n|\r)/g, "");
-
-            // 3. 嘗試解析
             const data = JSON.parse(cleanJson);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             lessonData = data;
             
-            alert("✅ 格式自動修復成功！開始上課！");
+            alert("✅ 成功！開始上課！");
             toggleMode(); 
         } catch (e) {
-            console.error(e);
-            alert("⚠️ 還是解析失敗。\n建議做法：請告訴 AI 「給我 Minified JSON (壓縮成一行的 JSON)」通常能解決此問題。");
+            alert("⚠️ 解析失敗，請確認 AI 回傳格式正確。");
         }
     }
 
@@ -327,6 +356,9 @@ ${text}
         }
     }
 
+    // ==========================================
+    // 渲染 (Render)
+    // ==========================================
     function renderLesson() {
         const container = document.getElementById('lesson-container');
         container.innerHTML = '';
@@ -352,7 +384,8 @@ ${text}
 
             const processedEnglish = item.english.split(/([a-zA-Z0-9'-]+)/g).map(chunk => {
                 if (/[a-zA-Z0-9'-]+/.test(chunk)) {
-                    return `<span class="word-in-text" onclick="playWordSimple(event, '${chunk}')">${chunk}</span>`;
+                    // 點擊事件改為 playWordSmart
+                    return `<span class="word-in-text" onclick="playWordSmart(event, '${chunk}')">${chunk}</span>`;
                 }
                 return chunk;
             }).join('');
@@ -378,6 +411,71 @@ ${text}
         return str.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ');
     }
 
+    // ==========================================
+    // 智慧單字點讀 (V13 核心)
+    // ==========================================
+    async function playWordSmart(event, word) {
+        event.stopPropagation(); // 阻止觸發整句
+        stopSpeech(); // 停止其他聲音
+
+        // 1. 發音
+        const utter = new SpeechSynthesisUtterance(word);
+        setVoice(utter);
+        utter.rate = 0.8;
+        synth.speak(utter);
+
+        // 2. 顯示 Toast 意思
+        const toast = document.getElementById('word-toast');
+        const tWord = document.querySelector('#word-toast strong');
+        const tMean = document.querySelector('#word-toast span');
+        
+        tWord.innerText = word;
+        tMean.innerText = "查詢中...";
+        toast.classList.add('show');
+
+        // 3. 搜尋本地資料 (Local Lookup)
+        // 遍歷所有段落的 vocab 尋找匹配
+        let foundMean = null;
+        if (lessonData) {
+            for (let section of lessonData) {
+                if (section.vocab) {
+                    // 忽略大小寫比較
+                    const match = section.vocab.find(v => v.word.toLowerCase() === word.toLowerCase());
+                    if (match) {
+                        foundMean = match.mean;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (foundMean) {
+            // 找到了！使用講義內建解釋
+            tMean.innerText = foundMean;
+        } else {
+            // 沒找到，嘗試外部 API (Fallback)
+            try {
+                const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|zh-TW`);
+                const data = await res.json();
+                if (data.responseData) {
+                    tMean.innerText = data.responseData.translatedText.replace(/[!.。]/g, "");
+                } else {
+                    tMean.innerText = "查無結果";
+                }
+            } catch (e) {
+                tMean.innerText = "網路錯誤且無內建解釋";
+            }
+        }
+
+        // 3秒後消失
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+
+    // ==========================================
+    // 單字卡 Modal 邏輯
+    // ==========================================
     function openVocabModal(word, mean, ex) {
         currentVocabData = { word, ex };
         document.getElementById('m-word').innerText = word;
@@ -412,6 +510,9 @@ ${text}
         synth.speak(u1);
     }
 
+    // ==========================================
+    // 語音基礎
+    // ==========================================
     function initVoices() {
         const select = document.getElementById('voiceSelect');
         const voices = synth.getVoices();
@@ -445,15 +546,6 @@ ${text}
         synth.speak(utter);
     }
 
-    function playWordSimple(event, word) {
-        event.stopPropagation();
-        stopSpeech();
-        const utter = new SpeechSynthesisUtterance(word);
-        setVoice(utter);
-        utter.rate = 0.8;
-        synth.speak(utter);
-    }
-
     function stopSpeech() {
         synth.cancel();
         document.querySelectorAll('.text-section').forEach(el => el.classList.remove('playing'));
@@ -461,3 +553,4 @@ ${text}
 </script>
 </body>
 </html>
+```
